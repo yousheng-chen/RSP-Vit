@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+
+# IDE
+.idea/
+.vs/
+.vscode/
+
+# Project generated / large data
+checkpoint/
+data/
+tmp_confidential_docx/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Git / repo metadata
+.git/
+.agents/
+.codex/
+
+# Other
+*.pdf
+*.log
+
+# Keep source, models, config, requirements, README
+!src/**/__pycache__/

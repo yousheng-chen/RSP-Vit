@@ -1,0 +1,401 @@
+%%%%%%%%%%%%%%%%%%%% author.tex %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% sample root file for your "contribution" to a proceedings volume
+%
+% Use this file as a template for your own input.
+%
+%%%%%%%%%%%%%%%% Springer %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\documentclass{svproc}
+%
+% RECOMMENDED %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+
+% to typeset URLs, URIs, and DOIs
+\usepackage{url}
+\usepackage{graphicx}
+\def\UrlFont{\rmfamily}
+\graphicspath{{figures/}}
+
+
+\begin{document}
+\mainmatter              % start of a contribution
+%
+\title{RSP-ViT: A Lightweight Transformer for UAV-to-Ground Human Activity Recognition Based on Radar Micro-Doppler Signatures}
+%
+\titlerunning{RSP-ViT for Micro-Doppler Recognition}  
+% abbreviated title (for running head)
+%                                     also used for the TOC unless
+%                                     \toctitle is used
+%
+\author{Ivar Ekeland\inst{1} \and Roger Temam\inst{2}
+Jeffrey Dean \and David Grove \and Craig Chambers \and Kim~B.~Bruce \and
+Elsa Bertino}
+%
+\authorrunning{Ivar Ekeland et al.} % abbreviated author list (for running head)
+%
+%%%% list of authors for the TOC (use if author list has to be modified)
+\tocauthor{Ivar Ekeland, Roger Temam, Jeffrey Dean, David Grove,
+Craig Chambers, Kim B. Bruce, and Elisa Bertino}
+%
+\institute{Princeton University, Princeton NJ 08544, USA,\\
+\email{I.Ekeland@princeton.edu},\\ WWW home page:
+\texttt{http://users/\homedir iekeland/web/welcome.html}
+\and
+Universit\'{e} de Paris-Sud,
+Laboratoire d'Analyse Num\'{e}rique, B\^{a}timent 425,\\
+F-91405 Orsay Cedex, France}
+
+\maketitle              % typeset the title of the contribution
+
+\begin{abstract}
+Radar micro-Doppler sensing provides an effective solution for privacy-preserving and contactless human activity recognition, particularly in UAV-to-ground surveillance scenarios. However, conventional vision transformers suffer from insufficient local feature modeling and parameter redundancy when applied to radar spectrograms, which limits their deployment on resource-constrained UAV platforms.To address these challenges, this paper proposes a task-oriented lightweight architecture, termed RSP-ViT, for UAV-to-ground human activity recognition based on radar micro-Doppler signatures. In the proposed framework, raw FMCW radar echoes collected by UAV platforms are first transformed into time-frequency micro-Doppler representations via a 2D FFT-based processing pipeline.To enhance local pattern modeling while reducing computational complexity, a convolutional stem with residual-style design is introduced, and parameter sharing across transformer layers is employed to significantly reduce model redundancy. This design enables effective feature representation under constrained model capacity.Experimental results demonstrate that the proposed method achieves higher recognition accuracy than the vanilla vision transformer. Moreover, compared with lightweight CNN models of comparable parameter scale, RSP-ViT provides superior performance, achieving a more favorable trade-off between accuracy and efficiency.
+% We would like to encourage you to list your keywords within
+% the abstract section using the \keywords{...} command.
+\keywords{Millimeter-wava radar micro-Doppler effect, UAV-to-ground recognition, human activity, lightweight transformer}
+\end{abstract}
+%
+
+
+
+
+
+
+\section{Introduction}
+
+Radar-based human activity recognition (HAR) has become an important research topic for privacy-preserving and contactless perception in healthcare, smart-home, and security applications \cite{Vandersmissen2018}. Compared with camera-based sensing, radar systems are less sensitive to illumination variation, partial occlusion, and adverse weather conditions, which makes them attractive for practical deployment. These characteristics are particularly desirable in UAV-to-ground sensing scenarios, where robustness, wide-area coverage, and non-intrusive perception are required. Moreover, platform mobility and dynamic observation conditions introduce additional challenges for reliable perception.
+
+In an FMCW radar system, body-part motions such as arm swings, leg movements, and torso displacement induce characteristic micro-Doppler modulations that encode fine-grained motion characteristics of different human body parts \cite{Chen2006}. These motion patterns are commonly transformed into time-frequency representations to support subsequent recognition \cite{Harmanny2014}. For UAV-mounted radar platforms, such representations are especially important due to platform motion and complex ground clutter, which impose additional challenges on robust feature extraction.
+
+Early learning-based studies demonstrated that deep networks can identify human gait and activity patterns from radar micro-Doppler measurements with promising accuracy \cite{Papanastasiou2021}. Subsequent work extended radar-based recognition toward more general activity analysis and explored learning strategies under limited labeled data \cite{Li2022SemiHAR}. Sequence-aware architectures further showed that explicit temporal modeling is beneficial when radar signatures evolve continuously over time \cite{Du2020SCGRNN}. More recently, hybrid transformer-based designs have been explored for radar human activity recognition, indicating the potential of combining convolutional priors with global dependency modeling \cite{Huan2023LHViT}.
+
+From a model-design perspective, residual convolutional networks remain effective for stable optimization and local pattern extraction \cite{He2016ResNet}, while MobileNetV2 provides a representative lightweight baseline for efficient deployment \cite{Sandler2018MobileNetV2}. In contrast, the Vision Transformer offers stronger long-range modeling capability through self-attention \cite{Dosovitskiy2021ViT}. Despite these advantages, existing models still face challenges when applied to UAV-based radar tasks. In particular, when directly applied to micro-Doppler images, a vanilla vision transformer suffers from weak local inductive bias and non-negligible parameter redundancy. These limitations become more critical under UAV resource constraints.
+
+To address the challenges of limited local modeling capability and parameter redundancy under UAV resource constraints, this paper proposes a lightweight recognition model termed RSP-ViT, short for ResNet-Stem Shared-Parameter Vision Transformer. The proposed architecture introduces a convolutional stem with residual-style design before token embedding to strengthen local feature extraction. Meanwhile, parameter sharing is employed across transformer layers to reduce model redundancy and computational cost, thereby enabling improved recognition performance while maintaining reduced model complexity for resource-constrained deployment.
+
+In addition, a practical 2D FFT-based signal processing pipeline is adopted to convert raw FMCW radar echoes into micro-Doppler images. These representations serve as input to the proposed RSP-ViT model for subsequent human activity recognition. In this way, a complete framework is established, covering UAV-based radar signal acquisition, micro-Doppler feature representation, and deep learning-based activity classification.
+
+The contributions of this work are summarized as follows:
+\begin{itemize}
+\item A practical micro-Doppler image generation pipeline based on 2D FFT is adopted, linking raw radar echoes to recognition-oriented time-frequency representations in UAV sensing scenarios.
+\item A lightweight recognition architecture, termed RSP-ViT, is proposed to improve the accuracy-efficiency trade-off under comparable parameter constraints by integrating a residual-style convolutional stem and shared-parameter transformer encoding.
+\item Extensive experiments are conducted against a vanilla vision transformer and representative lightweight baselines, demonstrating that the proposed model achieves higher recognition accuracy and a more favorable balance between performance and efficiency.
+\end{itemize}
+
+
+
+%信号处理部分
+\section{Radar Signal Processing and Micro-Doppler Generation}
+
+To establish a complete sensing-to-recognition framework for UAV-based radar perception, the input images used in this work are generated from raw FMCW radar echoes through a standard 2D FFT-based preprocessing pipeline. The purpose of this stage is to convert complex radar measurements into a compact time-frequency representation that preserves motion-dependent characteristics for subsequent activity recognition.
+
+
+\subsection{FMCW Radar Configuration}
+
+The main radar parameters used for data acquisition are listed in Table~\ref{tab:radar_parameters}. The system operates at 77~GHz with a bandwidth of 768~MHz. For each pulse, 256 sampling points are collected at an ADC sampling frequency of 6~MHz. Each frame contains 255 pulses, and 1000 frames are recorded with a frame period of 13~ms. These parameter settings are selected to balance range resolution, velocity resolution, and temporal continuity, which are critical for capturing fine-grained human motion signatures in UAV-based sensing scenarios. The practical UAV-to-ground acquisition setup is illustrated in Fig.~\ref{fig:radar_setup}, including the measured air-to-ground experimental scene and the UAV-borne millimeter-wave radar platform used for data collection.
+
+
+\begin{figure}[t]
+\centering
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{cc}
+\includegraphics[width=0.46\textwidth]{editor/figures/雷达实测场景.png} &
+\includegraphics[width=0.46\textwidth]{editor/figures/实测无人机.png} \\
+(a) UAV-to-ground measured scene & (b) UAV-borne radar platform
+\end{tabular}
+\caption{UAV-to-ground micro-Doppler data acquisition setup. (a) Measured air-to-ground experimental scene. (b) UAV-borne millimeter-wave radar platform used for data collection.}
+\label{fig:radar_setup}
+\end{figure}
+
+
+\begin{table}[t]
+\caption{Radar parameter configuration.}
+\label{tab:radar_parameters}
+\centering
+\begin{tabular}{ll}
+\hline
+Parameter name & Set value \\
+\hline
+Carrier frequency & 77~GHz \\
+Bandwidth & 768~MHz \\
+ADC sampling frequency & 6~MHz \\
+Number of sampling points per pulse & 256 \\
+Number of pulses per frame & 255 \\
+Number of frames & 1000 \\
+Frame period & 13~ms \\
+\hline
+\end{tabular}
+\end{table}
+
+
+
+
+
+\subsection{2D FFT-Based Range-Doppler Processing}
+
+For each frame, the sampled beat signals are arranged into a two-dimensional matrix, where the fast-time dimension corresponds to samples within a pulse and the slow-time dimension corresponds to pulses within a frame. A range FFT is first performed along the fast-time dimension to separate reflections at different distances. A Doppler FFT is then applied along the slow-time dimension to estimate velocity-related frequency shifts, thereby generating a range-Doppler map for each frame \cite{Chen2006}, which serves as a fundamental representation for moving target analysis in UAV-based radar systems. In this way, the two-dimensional transform provides a joint description of target distance and radial motion.
+
+\subsection{Micro-Doppler Image Generation}
+
+The range-Doppler map of a single frame reflects the instantaneous energy distribution in the range-velocity plane. To characterize human motion over time, the Doppler responses associated with target-related range bins are accumulated for each frame and then stacked across consecutive frames. The resulting micro-Doppler image uses slow time as the horizontal axis, radial velocity as the vertical axis, and echo intensity as the pixel value \cite{Harmanny2014}. Since different activities produce distinct temporal Doppler evolution patterns, this representation is well suited for image-based human activity recognition. In this work, the generated micro-Doppler images are used as the input to the proposed RSP-ViT model, enabling end-to-end learning from radar signal representation to activity classification. Representative $0$~dB micro-Doppler inputs of all nine activity categories are shown in Fig.~\ref{fig:microdoppler_examples}.
+
+
+
+
+\begin{figure}[t]
+\centering
+\setlength{\tabcolsep}{1pt}
+\renewcommand{\arraystretch}{0.92}
+\begin{tabular}{ccc}
+\includegraphics[width=0.275\textwidth]{editor/figures/0db-0.jpg} &
+\includegraphics[width=0.275\textwidth]{editor/figures/0db-1.jpg} &
+\includegraphics[width=0.275\textwidth]{editor/figures/0db-2.jpg} \\
+(a) Backpack walking  & (b) Walking  & (c) Walking with waving  \\
+
+\includegraphics[width=0.275\textwidth]{editor/figures/0db-3.jpg} &
+\includegraphics[width=0.275\textwidth]{editor/figures/0db-4.jpg} &
+\includegraphics[width=0.275\textwidth]{editor/figures/0db-5.jpg} \\
+(d) Waving  & (e) Jogging  & (f) Running with waving  \\
+
+\includegraphics[width=0.275\textwidth]{editor/figures/0db-6.jpg} &
+\includegraphics[width=0.275\textwidth]{editor/figures/0db-7.jpg} &
+\includegraphics[width=0.275\textwidth]{editor/figures/0db-8.jpg} \\
+(g) Stepping with waving  & (h) In-place boxing  & (i) In-place stepping 
+\end{tabular}
+\caption{Representative $0$~dB micro-Doppler inputs of the nine activity categories.}
+\label{fig:microdoppler_examples}
+\end{figure}
+
+
+
+
+
+
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.96\textwidth]{editor/figures/overall_pipeline.png}
+\caption{Overall pipeline of the proposed UAV-to-ground human activity recognition framework. Raw FMCW radar echoes acquired by the UAV-borne platform are processed through a 2D FFT-based pipeline to generate micro-Doppler representations, which are then preprocessed and fed into the proposed RSP-ViT for final activity classification.}
+\label{fig:overall_pipeline}
+\end{figure}
+
+
+
+
+%模型部分
+\section{Proposed RSP-ViT Model}
+
+This section presents the proposed RSP-ViT, short for ResNet-Stem Shared-Parameter Vision Transformer. The model is designed for micro-Doppler image recognition in UAV-based radar sensing scenarios, where fine-grained Doppler structures and long-range temporal dependencies are both critical for accurate activity recognition under constrained computational resources. As shown in Fig.~\ref{fig:rspvit_framework}, the proposed architecture consists of three main components: a lightweight convolutional stem for local feature extraction, a shared-parameter transformer encoder for global representation learning, and a standard MLP head for activity classification.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.96\textwidth]{editor/figures/rspvit_framework.png}
+\caption{Overall architecture of the proposed RSP-ViT model. The input micro-Doppler image is first processed by a ResNet-style convolutional stem, then converted into patch tokens with positional embeddings, encoded by shared transformer layers, and finally classified by an MLP head.}
+\label{fig:rspvit_framework}
+\end{figure}
+
+\subsection{Overall Architecture}
+
+Let the input micro-Doppler image be denoted by $I$. The image is first processed by a convolutional stem to better capture locally concentrated Doppler energy patterns before tokenization. The resulting feature map is then converted into a token sequence and combined with a learnable classification token and positional embeddings. The token sequence is subsequently fed into $L$ transformer encoder layers. Finally, the output feature corresponding to the classification token is passed to a two-layer multilayer perceptron for category prediction. The overall forward process can be written as
+\begin{equation}
+Z_0 = \mathrm{Tokenize}(\mathrm{Stem}(I)) + E_{\mathrm{pos}},
+\end{equation}
+\begin{equation}
+Z_l = \mathcal{T}_{\theta}(Z_{l-1}), \quad l=1,2,\ldots,L,
+\end{equation}
+\begin{equation}
+\hat{y} = \mathrm{Head}(Z_L^{\mathrm{cls}}),
+\end{equation}
+where $\mathcal{T}_{\theta}(\cdot)$ denotes the shared transformer encoder, $E_{\mathrm{pos}}$ denotes positional embeddings, and $Z_L^{\mathrm{cls}}$ denotes the final classification token.
+
+\subsection{ResNet-Style Convolutional Stem}
+
+In a vanilla vision transformer, image patches are directly projected into token embeddings through a single patchifying operation \cite{Dosovitskiy2021ViT}. However, micro-Doppler images exhibit structured local patterns, such as narrow Doppler ridges, periodic streaks, and short-term texture variations. Given these characteristics, convolutional operations are more effective in capturing such localized features. Therefore, RSP-ViT introduces a lightweight ResNet-style convolutional stem prior to token embedding. Specifically, two successive $3 \times 3$ convolutional blocks with stride 2 are employed to progressively extract local features and reduce spatial resolution. A patch projection layer is then used to convert the convolutional features into transformer tokens. This design enhances local inductive bias while maintaining compatibility with the transformer architecture, making it suitable for micro-Doppler data with strong local structures.
+
+\subsection{Shared-Parameter Transformer Encoder}
+
+After tokenization, the feature sequence is modeled by a stack of transformer encoder layers. Each encoder layer consists of multi-head self-attention and a feed-forward network with residual connections and layer normalization. To reduce parameter redundancy, layer-wise parameter sharing is adopted across transformer layers, where the same encoder parameters are reused at different depths. This design is motivated by the need for compact models in data-limited and resource-constrained scenarios, such as UAV-based radar perception. Compared with a standard vision transformer, this strategy significantly reduces the parameter budget while preserving the ability of self-attention to model long-range dependencies.
+
+\subsection{Classification Head and Design Rationale}
+
+The final classification token is fed into a standard two-layer MLP head to produce activity predictions. Compared with a vanilla vision transformer, the proposed RSP-ViT introduces two key improvements. First, the convolutional stem enhances the extraction of locally structured Doppler features. Second, the shared-parameter transformer reduces structural redundancy and improves parameter efficiency. As a result, the proposed model achieves superior recognition performance under comparable parameter constraints, making it more suitable for lightweight UAV-based radar human activity recognition tasks.
+
+
+
+
+
+%数据分析部分
+%数据分析部分
+\section{Experimental Results and Discussion}
+
+\subsection{Experimental Settings}
+
+All experiments were implemented in PyTorch based on the recorded benchmark logs in the project. The micro-Doppler dataset was evaluated under additive Gaussian white noise at different levels, including $-10$, $-5$, $0$, $5$, and $10$~dB. Each subset contains nine activity categories. Following the project configuration, all input images were resized to $192 \times 192$. For the main runs, the data were divided into $50\%$ training, $25\%$ validation, and $25\%$ test sets. The models were trained for 10 epochs with a batch size of 32 using the Adam optimizer, an initial learning rate of $1\times10^{-4}$, weight decay of $1\times10^{-5}$, and a cosine annealing learning-rate schedule. Test accuracy is used as the primary evaluation metric, and parameter count is reported to measure model complexity.
+
+
+
+\subsection{Comparison with Representative Baselines}
+
+The main objective of this study is to verify whether the proposed RSP-ViT can provide a more favorable trade-off between recognition accuracy and model compactness than a vanilla vision transformer and a representative lightweight CNN. To present a direct and fair comparison under a representative operating condition, the quantitative results in this subsection are reported at the $0$~dB noise level, which corresponds to a moderate noise setting. The compared models include the vanilla ViT baseline, MobileNetV2, and the proposed RSP-ViT. The corresponding results are listed in Table~\ref{tab:main_compare}.
+
+As shown in Table~\ref{tab:main_compare}, RSP-ViT achieves the highest test accuracy of $99.83\%$ at $0$~dB. Compared with the vanilla ViT, the proposed model improves test accuracy by $1.28$ percentage points while reducing the parameter count from 6.284~M to 2.421~M, corresponding to a $61.48\%$ reduction. Compared with MobileNetV2, RSP-ViT improves test accuracy by $3.16$ percentage points, while the parameter increase remains modest. These results indicate that the proposed design provides a more favorable balance between accuracy and efficiency for micro-Doppler recognition in UAV-oriented, resource-constrained radar perception.
+
+Representative input micro-Doppler images under three representative Gaussian white noise levels are shown in Fig.~\ref{fig:noise_input_examples}. To keep the main paper concise, only the low-, medium-, and high-noise cases are visualized here, while the quantitative results for all tested noise levels are reported in the subsequent ablation and robustness analysis.
+
+\begin{figure}[t]
+\centering
+\setlength{\tabcolsep}{2pt}
+\begin{tabular}{ccc}
+\includegraphics[width=0.31\textwidth]{editor/figures/md_input_n10db.png} &
+\includegraphics[width=0.31\textwidth]{editor/figures/md_input_0db.png} &
+\includegraphics[width=0.31\textwidth]{editor/figures/md_input_10db.png} \\
+(a) $-10$ dB & (b) $0$ dB & (c) $10$ dB
+\end{tabular}
+\caption{Representative input micro-Doppler images under different additive Gaussian white noise levels. The same activity sample is shown for visual comparison across noise conditions.}
+\label{fig:noise_input_examples}
+\end{figure}
+
+\begin{table}[t]
+\caption{Comparison with representative baseline models at the $0$~dB noise level.}
+\label{tab:main_compare}
+\centering
+\small
+\begin{tabular}{lccc}
+\hline
+Model & Params (M) & Best val. (\%) & Test acc. (\%) \\
+\hline
+Vanilla ViT & 6.284 & 98.61 & 98.56 \\
+MobileNetV2 & 2.235 & 96.17 & 96.67 \\
+RSP-ViT (ours) & 2.421 & 99.83 & 99.83 \\
+\hline
+\end{tabular}
+\end{table}
+
+To further analyze the class-wise recognition behavior under a challenging low-SNR condition, the confusion matrices of the vanilla ViT baseline and the proposed RSP-ViT at $-10$~dB are shown in Fig.~\ref{fig:cm_main_compare}. The proposed model exhibits clearer diagonal concentration and reduced inter-class confusion in this representative difficult case, which is consistent with its strong overall recognition capability.
+
+\begin{figure}[t]
+\centering
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{cc}
+\includegraphics[width=0.47\textwidth]{editor/figures/cm_vanilla_vit_minus10db.png} &
+\includegraphics[width=0.47\textwidth]{editor/figures/cm_rspvit_minus10db.png} \\
+(a) Vanilla ViT ($-10$~dB) & (b) RSP-ViT ($-10$~dB)
+\end{tabular}
+\caption{Confusion matrices of the vanilla ViT baseline and the proposed RSP-ViT under the $-10$~dB condition. The proposed model shows stronger diagonal concentration and reduced inter-class confusion in this representative low-SNR case.}
+\label{fig:cm_main_compare}
+\end{figure}
+
+
+\subsection{Ablation Study on Parameter Sharing and ResNet-Style Stem}
+
+To clarify the individual effects of transformer parameter sharing and the ResNet-style convolutional stem, a unified four-mode ablation experiment was conducted. The compared variants include the vanilla ViT, the shared-parameter ViT, the stem-only ViT, and the proposed RSP-ViT. For consistency with the main comparison, the ablation results reported in this subsection are taken from the representative $0$~dB condition. The corresponding results are summarized in Table~\ref{tab:ablation_compare}.
+
+As shown in Table~\ref{tab:ablation_compare}, introducing parameter sharing alone reduces the parameter count from 6.284~M to 2.335~M, but also decreases the test accuracy from $98.56\%$ to $97.72\%$. This observation indicates that parameter sharing is effective for model compression, but it weakens representation capability when applied without additional local enhancement. In contrast, introducing the ResNet-style stem alone improves the test accuracy to $99.78\%$, showing that enhanced local modeling is highly beneficial for micro-Doppler recognition.
+
+When both designs are combined, the proposed RSP-ViT achieves the highest test accuracy of $99.83\%$ with only 2.421~M parameters. Compared with the stem-only ViT, RSP-ViT further improves the test accuracy slightly while reducing the parameter count from 6.369~M to 2.421~M, corresponding to a $61.99\%$ reduction. These results demonstrate that the proposed combination of parameter sharing and a ResNet-style front end is effective for achieving both compactness and strong recognition performance, which is desirable for UAV-oriented deployment.
+
+\begin{table}[t]
+\caption{Ablation results of parameter sharing and the ResNet-style stem at the $0$~dB noise level.}
+\label{tab:ablation_compare}
+\centering
+\small
+\begin{tabular}{lccccc}
+\hline
+Model & Shared params & ResNet-style stem & Params (M) & Best val. (\%) & Test acc. (\%) \\
+\hline
+Vanilla ViT & No  & No  & 6.284 & 98.61 & 98.56 \\
+Shared ViT  & Yes & No  & 2.335 & 97.22 & 97.72 \\
+Stem-only ViT & No & Yes & 6.369 & 99.56 & 99.78 \\
+RSP-ViT & Yes & Yes & 2.421 & 99.83 & 99.83 \\
+\hline
+\end{tabular}
+\end{table}
+
+
+\subsection{Robustness Under Gaussian White Noise}
+
+Besides the comparison under a representative operating point, robustness under different noise intensities is another important criterion for radar-based perception. To evaluate this aspect, the recognition performance of the vanilla ViT baseline and the proposed RSP-ViT is further compared across all five Gaussian white noise levels. The corresponding results are summarized in Table~\ref{tab:robustness_compare}.
+
+As shown in Table~\ref{tab:robustness_compare}, RSP-ViT outperforms the vanilla ViT at four out of the five tested noise levels, namely $-5$, $0$, $5$, and $10$~dB. In particular, the gains reach $0.94$, $1.28$, and $1.06$ percentage points at $0$, $5$, and $10$~dB, respectively. At the most severe noise level of $-10$~dB, the vanilla ViT remains stronger, indicating that aggressive parameter sharing still introduces a performance penalty under extremely low-SNR conditions. Nevertheless, the mean test accuracy of RSP-ViT over the five tested noise levels reaches $99.01\%$, which is $0.43$ percentage points higher than that of the vanilla ViT baseline. This result suggests that the proposed design maintains a strong overall robustness advantage while preserving a compact model size.
+
+\begin{table}[t]
+\caption{Robustness comparison between the vanilla ViT baseline and RSP-ViT under Gaussian white noise.}
+\label{tab:robustness_compare}
+\centering
+\small
+\begin{tabular}{lccc}
+\hline
+Noise level (dB) & Vanilla ViT (\%) & RSP-ViT (\%) & Gain (\%) \\
+\hline
+$-10$ & 98.00 & 95.67 & -2.33 \\
+$-5$  & 98.83 & 99.78 & +0.94 \\
+$0$   & 98.56 & 99.83 & +1.28 \\
+$5$   & 98.67 & 99.89 & +1.22 \\
+$10$  & 98.83 & 99.89 & +1.06 \\
+Mean  & 98.58 & 99.01 & +0.43 \\
+\hline
+\end{tabular}
+\end{table}
+
+
+
+
+
+
+%结尾
+\section{Conclusion}
+
+This paper presented a complete FMCW radar-based human activity recognition framework for UAV-to-ground sensing scenarios, establishing a task-oriented pipeline from raw radar echoes to activity classification through micro-Doppler representations.
+
+To address the characteristics of micro-Doppler data, including structured local spectral patterns and deployment-oriented model constraints, the proposed RSP-ViT was developed by combining a ResNet-style convolutional stem with a shared-parameter transformer encoder. The convolutional stem enhances local feature extraction before tokenization, while parameter sharing reduces model redundancy and improves compactness.
+
+Experimental results demonstrated that RSP-ViT achieves a favorable balance between recognition accuracy and model complexity. In representative comparisons, the proposed model outperformed both the vanilla ViT baseline and MobileNetV2 under the moderate-noise condition while using substantially fewer parameters than the standard transformer. The unified ablation study further showed that the convolutional front end is the main source of performance gain, whereas parameter sharing contributes primarily to model compression. Their combination enables RSP-ViT to retain strong recognition capability with a much smaller parameter budget, making it well suited for UAV-oriented, resource-constrained radar perception.
+
+Future work will further investigate more realistic airborne operating conditions, including viewpoint variation, platform motion disturbance, and clutter complexity, as well as deployment-oriented optimization for real-time onboard radar perception.
+
+
+
+
+
+
+% ---- Bibliography ----
+%引用部分
+\begin{thebibliography}{10}
+
+\bibitem{Vandersmissen2018}
+Vandersmissen, B., Knudde, N., Jalalvand, A., Couckuyt, I., Bourdoux, A., De Neve, W., Dhaene, T.: Indoor person identification using a low-power FMCW radar. IEEE Transactions on Geoscience and Remote Sensing 56(7), 3941--3952 (2018)
+
+\bibitem{Chen2006}
+Chen, V.C., Li, F., Ho, S.-S., Wechsler, H.: Micro-Doppler effect in radar: phenomenon, model, and simulation study. IEEE Transactions on Aerospace and Electronic Systems 42(1), 2--21 (2006)
+
+\bibitem{Harmanny2014}
+Harmanny, R.I.A., Driessen, H., Janssen, H.W.M.: Radar micro-Doppler feature extraction using the spectrogram and the cepstrogram. In: 11th European Radar Conference (EuRAD), pp. 165--168. IEEE, Rome (2014)
+
+\bibitem{Papanastasiou2021}
+Papanastasiou, A., Trommel, R.P., Harmanny, R.I.A., Yarovoy, A.: Deep learning-based identification of human gait by radar micro-Doppler signatures. In: 18th European Radar Conference (EuRAD), pp. 89--92. IEEE, London (2021)
+
+\bibitem{Li2022SemiHAR}
+Li, X., He, Y., Jing, X., Zhang, X.: Semisupervised human activity recognition with radar micro-Doppler signatures. IEEE Transactions on Geoscience and Remote Sensing 60, 1--14 (2022)
+
+\bibitem{Du2020SCGRNN}
+Du, H., Jin, T., Song, Y., Dai, Y.: Segmented convolutional gated recurrent neural networks for human activity recognition in ultra-wideband radar. Neurocomputing 396, 451--464 (2020)
+
+\bibitem{Huan2023LHViT}
+Huan, H., Xu, Y., Zhu, Y., Li, G., Zhang, L.: LH-ViT: A lightweight hybrid vision transformer for radar-based human activity recognition. Scientific Reports 13, 18617 (2023)
+
+\bibitem{He2016ResNet}
+He, K., Zhang, X., Ren, S., Sun, J.: Deep residual learning for image recognition. In: Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR), pp. 770--778. IEEE, Las Vegas (2016)
+
+\bibitem{Sandler2018MobileNetV2}
+Sandler, M., Howard, A., Zhu, M., Zhmoginov, A., Chen, L.-C.: MobileNetV2: Inverted residuals and linear bottlenecks. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR), pp. 4510--4520. IEEE, Salt Lake City (2018)
+
+\bibitem{Dosovitskiy2021ViT}
+Dosovitskiy, A., Beyer, L., Kolesnikov, A., Weissenborn, D., Zhai, X., Unterthiner, T., Dehghani, M., Minderer, M., Heigold, G., Gelly, S., Uszkoreit, J., Houlsby, N.: An image is worth 16x16 words: Transformers for image recognition at scale. In: International Conference on Learning Representations (ICLR) (2021)
+
+\bibitem{Lan2020ALBERT}
+Lan, Z., Chen, M., Goodman, S., Gimpel, K., Sharma, P., Soricut, R.: ALBERT: A lite BERT for self-supervised learning of language representations. In: International Conference on Learning Representations (ICLR) (2020)
+
+\end{thebibliography}
+
+\end{document}
